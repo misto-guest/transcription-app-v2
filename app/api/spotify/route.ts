@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { AssemblyAI } from 'assemblyai'
+import path from 'path'
+import fs from 'fs'
+import { glob } from 'glob'
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,32 +12,98 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 })
     }
 
-    // Extract Spotify track/playlist ID
-    const spotifyId = extractSpotifyId(url)
-    if (!spotifyId) {
-      return NextResponse.json({ error: 'Invalid Spotify URL' }, { status: 400 })
+    // Get API key from environment
+    const apiKey = process.env.ASSEMBLYAI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'AssemblyAI API key not configured. Please set ASSEMBLYAI_API_KEY environment variable.' },
+        { status: 500 }
+      )
     }
 
-    // MVP: Return information about what would happen
-    // In production, this would:
-    // 1. Download audio using spotify-downloader or spotdl
-    // 2. Transcribe using OpenAI Whisper API or local Whisper
-    // 3. Return the transcript
+    // Initialize AssemblyAI
+    const aai = new AssemblyAI({ apiKey })
+
+    // Create temp directory with absolute path
+    const tempDir = path.join(process.cwd(), 'temp', 'spotify')
+    await fs.promises.mkdir(tempDir, { recursive: true, mode: 0o755 })
+
+    // Extract Spotify ID for filename
+    const spotifyId = extractSpotifyId(url) || 'audio'
+    const outputPath = path.join(tempDir, `${spotifyId}.mp3`)
+
+    // Download audio using spotdl (using absolute paths)
+    const { spawn } = require('child_process')
+    const downloadPromise = new Promise<void>((resolve, reject) => {
+      const child = spawn('spotdl', [
+        url,
+        '--output-format', 'mp3',
+        '--output', outputPath
+      ], { stdio: 'pipe' })
+
+      let stderr = ''
+      child.stderr?.on('data', (data: Buffer) => {
+        stderr += data.toString()
+      })
+
+      child.on('close', (code: number | null) => {
+        if (code && code !== 0 && stderr.includes('Error')) {
+          reject(new Error(`spotdl failed: ${stderr}`))
+        } else {
+          resolve()
+        }
+      })
+    })
+
+    try {
+      await downloadPromise
+    } catch (error: any) {
+      return NextResponse.json(
+        { error: `Failed to download Spotify audio: ${error.message}` },
+        { status: 500 }
+      )
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(outputPath)) {
+      // Try to find any mp3 file in temp dir
+      const files = await glob('*.mp3', { cwd: tempDir })
+      if (files.length === 0) {
+        return NextResponse.json({ error: 'No audio file was downloaded' }, { status: 500 })
+      }
+    }
+
+    const audioPath = fs.existsSync(outputPath) ? outputPath : path.join(tempDir, (await glob('*.mp3', { cwd: tempDir }))[0])
+
+    // Transcribe using AssemblyAI (SDK handles upload + transcription)
+    let transcript
+    try {
+      transcript = await aai.transcripts.transcribe({ audio: audioPath })
+    } catch (error: any) {
+      // Clean up temp directory
+      fs.rmSync(tempDir, { recursive: true, force: true })
+      return NextResponse.json(
+        { error: `Failed to transcribe: ${error.message}` },
+        { status: 500 }
+      )
+    }
+
+    // Clean up temp directory
+    fs.rmSync(tempDir, { recursive: true, force: true })
+
+    if (!transcript.text) {
+      return NextResponse.json({ error: 'No transcript generated' }, { status: 500 })
+    }
 
     return NextResponse.json({
-      message: 'Spotify download/transcription feature',
-      spotifyId,
-      note: 'This MVP shows the structure. Full implementation requires spotify-downloader + Whisper API or local Whisper installation.',
-      steps: [
-        '1. Download audio from Spotify (requires spotify-downloader/spotdl)',
-        '2. Transcribe audio to text (requires OpenAI Whisper API or local Whisper)',
-        '3. Return transcript'
-      ]
+      transcript: transcript.text,
+      filename: path.basename(audioPath),
+      duration: transcript.audio_duration
     })
   } catch (error: any) {
-    console.error('Spotify error:', error)
+    console.error('Spotify transcription error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to process Spotify URL' },
+      { error: error.message || 'Failed to transcribe audio' },
       { status: 500 }
     )
   }
