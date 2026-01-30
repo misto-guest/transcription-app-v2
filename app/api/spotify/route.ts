@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
     // Initialize AssemblyAI
     const aai = new AssemblyAI({ apiKey })
 
-    // Create temp directory with absolute path
-    const tempDir = path.join(process.cwd(), 'temp', 'spotify')
+    // Create temp directory in /tmp (Vercel serverless-compatible)
+    const tempDir = path.join('/tmp', 'spotify', `${Date.now()}`)
     await fs.promises.mkdir(tempDir, { recursive: true, mode: 0o755 })
 
     // Extract Spotify ID for filename

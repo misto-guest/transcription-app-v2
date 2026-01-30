@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Create temp directory
-    const tempDir = path.join(process.cwd(), 'temp', 'uploads')
+    // Create temp directory in /tmp (Vercel serverless-compatible)
+    const tempDir = path.join('/tmp', 'uploads', `${Date.now()}`)
     await mkdir(tempDir, { recursive: true, mode: 0o755 })
 
     // Save uploaded file

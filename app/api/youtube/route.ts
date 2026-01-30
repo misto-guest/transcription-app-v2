@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
     // Initialize AssemblyAI
     const aai = new AssemblyAI({ apiKey })
 
-    // Create temp directory with absolute path
-    const tempDir = path.join(process.cwd(), 'temp', 'youtube')
+    // Create temp directory in /tmp (Vercel serverless-compatible)
+    const tempDir = path.join('/tmp', 'youtube', `${Date.now()}`)
     await fs.promises.mkdir(tempDir, { recursive: true, mode: 0o755 })
 
     // Output file path (use video ID as filename to avoid issues)
