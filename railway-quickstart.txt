@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# Quick Railway Setup Guide
+# Run this to see step-by-step instructions
+
+cat << 'EOF'
+🚀 Railway Migration - Quick Start Guide
+========================================
+
+## Prerequisites
+✓ Railway CLI installed (@railway/cli)
+✓ Transcription app code ready
+
+## Step-by-Step
+
+### 1️⃣ Login to Railway (Required First Time)
+   Command: railway login
+   
+   This will:
+   - Open your browser
+   - Ask for Railway authentication
+   - Store credentials locally
+   
+   ⚠️ Must be done before proceeding
+
+### 2️⃣ Initialize Railway Project
+   Command: cd ~/clawd-dmitry/transcription-app
+   Command: railway init
+   
+   Prompts:
+   - ? Search for a project? → No (create new)
+   - ? Project name → transcription-app
+   - ? Region → us-east (or your preference)
+   - ? Link to GitHub? → Yes (optional but recommended)
+
+### 3️⃣ Set Environment Variable
+   Command: railway variables set ASSEMBLYAI_API_KEY=da00adef1147469191157b3a562d82b3
+
+### 4️⃣ Deploy App
+   Command: railway up
+   
+   This will:
+   - Detect Next.js
+   - Install dependencies
+   - Build app
+   - Deploy to Railway
+   - Show your public URL
+
+### 5️⃣ Get Your URL
+   Command: railway domain
+   
+   Copy and test the URL!
+
+## 🧪 Test Your Deployment
+
+Test these URLs in the Railway app:
+1. YouTube: https://www.youtube.com/watch?v=AWxeTJp_lyk
+2. Spotify: https://open.spotify.com/track/18RGqi2N6qGVueHQwfOB7m
+
+## ✅ Success Criteria
+
+- ✓ App loads without errors
+- ✓ YouTube URL transcribes (takes 2-5 min)
+- ✓ Spotify URL transcribes (takes 2-5 min)
+- ✓ No timeout errors
+
+## 🔧 Troubleshooting
+
+### "Not logged in"
+Run: railway login
+
+### "Build failed"
+Check: railway logs --type build
+
+### "Deploy failed"
+Check: railway logs --type deploy
+
+### Need help?
+railway docs - opens browser with docs
+
+## 📊 After Success
+
+You now have:
+- 15-minute serverless timeout
+- Working transcription
+- Auto-deploy from GitHub (if linked)
+- Free tier ($5 credit/month)
+
+---
+
+Ready? Start with: railway login
+Then run: ~/clawd-dmitry/transcription-app/migrate-to-railway.sh
+
+EOF
