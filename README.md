@@ -2,6 +2,18 @@
 
 A simple web app to extract transcripts from YouTube videos, download/transcribe Spotify audio, and upload any audio file for transcription using AssemblyAI.
 
+## 📊 Status & History
+
+**Status Page:** https://transcription-app-woad.vercel.app/status
+
+The status page includes:
+- **Live system status** - Runtime info, model, capabilities
+- **Deployed apps** - Quick links to all production apps
+- **Complete build history** - Automatic timeline of all commits, deployments, and milestones
+- **Auto-refresh** - Updates every time you visit (data pulls from git, no manual updates needed)
+
+History is **fully automatic** - every commit and deploy is tracked without manual maintenance.
+
 ## Features
 
 ### ✅ Working
