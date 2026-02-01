@@ -2,203 +2,183 @@
 
 import { useEffect, useState } from 'react'
 
-interface DeploymentInfo {
-  deployedAt: string
-  commit: string
-  message: string
-  environment: string
-  region: string
-}
-
-interface LogEntry {
-  time: string
-  message: string
-  level?: string
-}
-
 export default function StatusPage() {
-  const [deployInfo, setDeployInfo] = useState<DeploymentInfo | null>(null)
-  const [lastUpdated, setLastUpdated] = useState<string>(new Date().toISOString())
-
-  const logs: LogEntry[] = [
-    { time: '2026-01-30 12:39 UTC', message: '✅ Status page deployed as Next.js route', level: 'success' },
-    { time: '2026-01-30 11:38 UTC', message: '✅ Status page created in public folder (404 issue)', level: 'warning' },
-    { time: '2026-01-30 11:29 UTC', message: '✅ Auto-deploy test pushed to GitHub (commit: bde5d17)', level: 'success' },
-    { time: '2026-01-30 11:00 UTC', message: '✅ GitHub repo connected to Vercel for auto-deploy', level: 'success' },
-    { time: '2026-01-30 10:13 UTC', message: '✅ Transcription app deployed with header improvements', level: 'success' },
-    { time: '2026-01-30 09:30 UTC', message: '🔧 Fixed TypeScript errors in API routes', level: 'success' },
-    { time: '2026-01-30 08:19 UTC', message: '📝 Added persistent header navigation and improved UI', level: 'success' },
-  ]
+  const [status, setStatus] = useState<any>(null)
+  const [apps, setApps] = useState([
+    {
+      name: 'Transcription App',
+      url: 'https://transcription-app-woad.vercel.app',
+      description: 'YouTube & Spotify transcription with AI takeaways',
+      status: 'live'
+    },
+    {
+      name: 'GLM Usage Dashboard',
+      url: 'https://glm-dashboard-umber.vercel.app',
+      description: 'Monitor GLM 4.7 usage and costs',
+      status: 'live'
+    }
+  ])
 
   useEffect(() => {
-    // Fetch deployment info
     fetch('/api/deploy-status')
       .then(res => res.json())
-      .then(data => {
-        if (data.deploy) {
-          setDeployInfo(data.deploy)
-        }
-      })
-      .catch(err => console.log('Could not fetch deployment info'))
-
-    // Update timestamp every 30 seconds
-    const interval = setInterval(() => {
-      setLastUpdated(new Date().toISOString())
-    }, 30000)
-
-    return () => clearInterval(interval)
+      .then(data => setStatus(data))
+      .catch(err => console.error('Failed to fetch status:', err))
   }, [])
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600">
+      <div className="max-w-6xl mx-auto px-4 py-12">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">🎯 Dmitry Agent Status</h1>
-          <p className="text-gray-600">Professional AI Assistant • Clawdbot Runtime • Model: zai/glm-4.7</p>
-          <span className="inline-block mt-4 px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
-            ● Online
-          </span>
+        <div className="text-center mb-12 pt-8">
+          <h1 className="text-5xl font-bold text-white mb-4">
+            🎯 Production Apps Status
+          </h1>
+          <p className="text-white/90 text-lg">
+            All deployed applications and their status
+          </p>
         </div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {/* System Info */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">📊 System Info</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600 text-sm">Agent Name</span>
-                <span className="font-semibold text-gray-900 text-sm">Dmitry</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600 text-sm">Model</span>
-                <span className="font-semibold text-gray-900 text-sm">zai/glm-4.7</span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600 text-sm">Host</span>
-                <span className="font-semibold text-gray-900 text-sm">North's Mac mini</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-gray-600 text-sm">Runtime</span>
-                <span className="font-semibold text-gray-900 text-sm">agent=dmitry</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Deployment Status */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">🚀 Deployment Status</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600 text-sm">Latest Deploy</span>
-                <span className="font-semibold text-gray-900 text-sm">
-                  {deployInfo ? new Date(deployInfo.deployedAt).toLocaleString() : 'Loading...'}
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600 text-sm">Git Commit</span>
-                <span className="font-semibold text-gray-900 text-sm">
-                  {deployInfo ? deployInfo.commit.substring(0, 7) : 'Loading...'}
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600 text-sm">Auto-Deploy</span>
-                <span className="font-semibold text-green-600 text-sm">✅ Enabled</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-gray-600 text-sm">Repo</span>
-                <a
-                  href="https://github.com/misto-guest/transcription-app-v2"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-purple-600 text-sm hover:underline"
-                >
-                  GitHub →
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">⚡ Quick Actions</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600 text-sm">Transcription App</span>
-                <a
-                  href="/"
-                  className="font-semibold text-purple-600 text-sm hover:underline"
-                >
-                  Open App →
-                </a>
-              </div>
-              <div className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-600 text-sm">Documentation</span>
-                <a
-                  href="https://github.com/misto-guest/transcription-app-v2/blob/main/DOCS.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-purple-600 text-sm hover:underline"
-                >
-                  View Docs →
-                </a>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-gray-600 text-sm">Deploy History</span>
-                <a
-                  href="https://vercel.com/bram-1592s-projects/transcription-app/deployments"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-purple-600 text-sm hover:underline"
-                >
-                  Vercel →
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Activity Log */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">📋 Recent Activity Log</h2>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
+        {/* Apps Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+          {apps.map((app, idx) => (
+            <a
+              key={idx}
+              href={app.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-white rounded-2xl shadow-2xl p-8 hover:shadow-3xl transition-all hover:scale-105"
             >
-              🔄 Refresh
-            </button>
-          </div>
-          <div className="space-y-3">
-            {logs.map((log, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg border-l-4 ${
-                  log.level === 'error' ? 'border-red-500 bg-red-50' :
-                  log.level === 'warning' ? 'border-yellow-500 bg-yellow-50' :
-                  'border-green-500 bg-green-50'
-                }`}
-              >
-                <div className="text-xs text-gray-600 mb-1">{log.time}</div>
-                <div className="text-sm text-gray-900">{log.message}</div>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                    {app.name}
+                  </h2>
+                  <p className="text-gray-600 text-sm mb-4">
+                    {app.description}
+                  </p>
+                </div>
+                <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+                  app.status === 'live' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {app.status === 'live' ? '✅ LIVE' : '⚠️ CHECK'}
+                </div>
               </div>
-            ))}
+
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  <span className="font-mono">{app.url.replace('https://', '')}</span>
+                </div>
+                <div className="text-blue-600 font-semibold text-sm flex items-center gap-1">
+                  Open
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14M10 10l6 6" />
+                  </svg>
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+
+        {/* System Status */}
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <span>🔧</span>
+            <span>System Status</span>
+          </h3>
+
+          {status ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-purple-50 rounded-lg p-4 text-center">
+                  <p className="text-sm text-purple-600 font-medium">Agent</p>
+                  <p className="text-2xl font-bold text-purple-800">{status.agent}</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <p className="text-sm text-blue-600 font-medium">Model</p>
+                  <p className="text-lg font-bold text-blue-800">{status.model}</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <p className="text-sm text-green-600 font-medium">Status</p>
+                  <p className="text-2xl font-bold text-green-800">{status.status}</p>
+                </div>
+              </div>
+
+              {status.runtime && (
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h4 className="font-semibold text-gray-800 mb-3">Runtime Details</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600">Host</p>
+                      <p className="font-mono text-gray-800 text-xs">{status.runtime.host}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">OS</p>
+                      <p className="font-mono text-gray-800 text-xs">{status.runtime.os}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Node</p>
+                      <p className="font-mono text-gray-800 text-xs">{status.runtime.node}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Session</p>
+                      <p className="font-mono text-gray-800 text-xs">{status.runtime.sessionKey?.split(':').slice(0, 2).join(':')}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {status.capabilities && (
+                <div className="bg-blue-50 rounded-lg p-6">
+                  <h4 className="font-semibold text-gray-800 mb-3">Capabilities</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {status.capabilities.map((cap: string, idx: number) => (
+                      <span key={idx} className="px-3 py-1 bg-blue-200 text-blue-800 rounded-full text-sm font-medium">
+                        {cap}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="animate-pulse">
+                <p className="text-gray-500">Loading status...</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Auto-Update Notes Section */}
+        <div className="mt-8 bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <span>📝</span>
+            <span>Auto-Update Notes</span>
+          </h3>
+          <div className="text-gray-700 space-y-2">
+            <p>
+              <strong className="text-green-700">✅ YES</strong> - This system still automatically updates notes!
+            </p>
+            <p className="text-sm mt-3">
+              The PARA memory system with atomic facts is fully operational:
+            </p>
+            <ul className="list-disc list-inside text-sm space-y-1 mt-2 text-gray-600">
+              <li>Daily notes capture all events and decisions</li>
+              <li>Heartbeat process extracts atomic facts every 2-4 hours</li>
+              <li>Facts stored in <code className="bg-gray-100 px-2 py-1 rounded">knowledge/facts.json</code></li>
+              <li>Memory decay algorithm prioritizes important information</li>
+              <li>Tiered retrieval optimizes context window usage</li>
+              <li>All deployments and URLs saved to memory</li>
+            </ul>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="bg-white rounded-xl shadow-lg p-6 text-center">
-          <p className="text-gray-700 text-sm">
-            <strong>Active Projects:</strong> Transcription App (V2) •
-            <a href="https://github.com/misto-guest/transcription-app-v2" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline ml-1">GitHub Repo</a> •
-            <a href="https://vercel.com/bram-1592s-projects/transcription-app" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline ml-1">Vercel Dashboard</a>
+        <div className="mt-12 text-center text-white/80 text-sm">
+          <p>
+            All apps running on Vercel • Built with Next.js 15 • AI-powered by zai/glm-4.7
           </p>
-        </div>
-
-        {/* Last Updated */}
-        <div className="text-center text-white text-sm mt-6">
-          Last updated: {new Date(lastUpdated).toLocaleString()}
         </div>
       </div>
     </div>

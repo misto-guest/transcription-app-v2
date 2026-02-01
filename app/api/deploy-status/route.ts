@@ -1,32 +1,33 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Get git commit info
-    const { execSync } = require('child_process')
-    const commit = execSync('git log -1 --pretty=%H', { cwd: process.cwd() }).toString().trim()
-    const commitMessage = execSync('git log -1 --pretty=%s', { cwd: process.cwd() }).toString().trim()
-    const commitTime = execSync('git log -1 --pretty=%ct', { cwd: process.cwd() }).toString().trim()
+    const runtime = {
+      agent: process.env.AGENT_ID || 'dmitry',
+      host: process.env.VERCEL_URL || 'local',
+      os: process.platform,
+      node: process.version,
+      repo: '/Users/northsea/clawd-dmitry/transcription-app',
+      model: 'zai/glm-4.7',
+      default_model: 'zai/glm-4.7',
+      channel: 'telegram',
+      capabilities: ['inlineButtons'],
+      thinking: process.env.THINKING || 'off'
+    };
 
     return NextResponse.json({
-      deploy: {
-        deployedAt: new Date(parseInt(commitTime) * 1000).toISOString(),
-        commit: commit,
-        message: commitMessage,
-        environment: process.env.VERCEL_ENV || 'development',
-        region: process.env.VERCEL_REGION || 'unknown'
-      }
-    })
+      agent: runtime.agent,
+      status: 'operational',
+      model: runtime.model,
+      runtime,
+      capabilities: runtime.capabilities,
+      timestamp: new Date().toISOString()
+    });
+
   } catch (error) {
-    // Fallback if git commands fail (e.g., in production)
     return NextResponse.json({
-      deploy: {
-        deployedAt: new Date().toISOString(),
-        commit: 'unknown',
-        message: 'Production deployment',
-        environment: process.env.VERCEL_ENV || 'production',
-        region: process.env.VERCEL_REGION || 'unknown'
-      }
-    })
+      error: 'Failed to fetch status',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

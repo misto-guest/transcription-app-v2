@@ -5,11 +5,19 @@ import Header from './components/Header'
 
 type ApiResult = {
   transcript?: string
+  takeaways?: string
   filename?: string
   duration?: number
   error?: string
   note?: string
   size?: number
+  source?: string
+  fallbackUsed?: boolean
+  stats?: {
+    characters: number
+    words: number
+  }
+  videoId?: string
 }
 
 export default function Home() {
@@ -416,53 +424,148 @@ export default function Home() {
 
         {/* Result */}
         {result && result.transcript && (
-          <div className="mt-6 md:mt-8 bg-white rounded-2xl shadow-2xl p-6 md:p-8">
-            <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6 pb-6 border-b border-gray-200">
-              <div>
-                <h2 className="text-xl font-bold mb-1 text-gray-800">Transcript</h2>
-                {result.filename && (
-                  <p className="text-sm text-gray-500">Source: {result.filename}</p>
-                )}
+          <div className="mt-6 md:mt-8 space-y-6">
+            {/* Key Takeaways - Highlighted */}
+            {result.takeaways && (
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-2xl shadow-xl p-6 md:p-8">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-yellow-200 flex items-center justify-center">
+                    <span className="text-2xl">🎯</span>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800">10 Key Takeaways</h2>
+                    <p className="text-sm text-gray-600">Actionable insights for your workflows</p>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur rounded-xl p-6 shadow-inner">
+                  <div className="prose prose-yellow max-w-none">
+                    {(() => {
+                      // Parse the takeaways and format each with a copy snippet
+                      const lines = result.takeaways!.split('\n').filter(line => line.trim());
+                      return lines.map((line, idx) => {
+                        // Extract the learning (before implementation phrase)
+                        const learningMatch = line.match(/\*\*(\d+)\.\s+\*\*(.+?)\s+\*\*/);
+                        if (!learningMatch) return null;
+
+                        const learning = learningMatch[2];
+                        const standardSnippet = `Implement learnings of this point into structured prompt and apply`;
+
+                        return (
+                          <div key={idx} className="mb-6 pb-6 border-b-2 border-yellow-200 last:border-0">
+                            <div className="bg-yellow-50 rounded-lg p-4 mb-3">
+                              <h4 className="text-lg font-bold text-gray-800 mb-2">
+                                #{idx + 1} {learning}
+                              </h4>
+                            </div>
+                            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3">
+                              <p className="text-sm text-blue-800 font-mono">
+                                <span className="font-bold">📋 Copy to Lovable:</span>
+                                <span className="ml-2">{standardSnippet} {learning.toLowerCase()}</span>
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-yellow-200">
+                  <p className="text-sm text-yellow-800 flex items-start gap-2">
+                    <span className="text-lg">💡</span>
+                    <span><strong>Tip:</strong> Copy the blue snippet into Lovable to implement each learning.</span>
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2 bg-purple-50 px-3 py-1.5 rounded-full">
-                {result.duration && (
-                  <span className="text-purple-600 font-medium text-sm">
-                    ⏱️ {formatDuration(result.duration)}
-                  </span>
-                )}
+            )}
+
+            {/* Stats Bar */}
+            <div className="bg-white rounded-2xl shadow-xl p-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Statistics</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-600">{result.stats?.characters || result.transcript.length.toLocaleString()}</p>
+                  <p className="text-sm text-blue-800 mt-1">Characters</p>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-purple-600">{result.stats?.words || result.transcript.split(/\s+/).length.toLocaleString()}</p>
+                  <p className="text-sm text-purple-800 mt-1">Words</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <p className="text-lg font-bold text-green-600">{result.source === 'youtube-transcript-api' ? 'YouTube API' : 'AssemblyAI'}</p>
+                  <p className="text-sm text-green-800 mt-1">Source</p>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-4 text-center">
+                  <p className="text-lg font-bold text-orange-600">{result.fallbackUsed ? '⚠️' : '✅'}</p>
+                  <p className="text-sm text-orange-800 mt-1">Fallback Used</p>
+                </div>
               </div>
             </div>
 
-            {result.note && (
-              <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-                ℹ️ {result.note}
+            {/* Full Transcript */}
+            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+              <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6 pb-6 border-b border-gray-200">
+                <div>
+                  <h2 className="text-xl font-bold mb-1 text-gray-800">📝 Full Transcript</h2>
+                  {result.filename && (
+                    <p className="text-sm text-gray-500">Source: {result.filename}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 bg-purple-50 px-3 py-1.5 rounded-full">
+                  {result.duration && (
+                    <span className="text-purple-600 font-medium text-sm">
+                      ⏱️ {formatDuration(result.duration)}
+                    </span>
+                  )}
+                </div>
               </div>
-            )}
 
-            <pre className="whitespace-pre-wrap text-gray-700 bg-gray-50 p-4 rounded-lg overflow-x-auto text-sm md:text-base leading-relaxed">
-              {result.transcript}
-            </pre>
+              {result.note && (
+                <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+                  ℹ️ {result.note}
+                </div>
+              )}
 
-            {result.transcript && (
-              <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-4 text-sm text-gray-500">
-                <span>
-                  📝 {result.transcript.split(/\s+/).length} words
-                </span>
-                <span>
-                  📄 {result.transcript.length} characters
-                </span>
-                {result.duration && (
+              <pre className="whitespace-pre-wrap text-gray-700 bg-gray-50 p-4 rounded-lg overflow-x-auto text-sm md:text-base leading-relaxed">
+                {result.transcript}
+              </pre>
+
+              {result.transcript && (
+                <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-4 text-sm text-gray-500">
                   <span>
-                    📊 ~{Math.round(result.transcript.split(/\s+/).length / (result.duration / 60))} words/min
+                    📝 {result.stats?.words || result.transcript.split(/\s+/).length} words
                   </span>
-                )}
-                {result.size && (
                   <span>
-                    💾 {formatFileSize(result.size)}
+                    📄 {result.stats?.characters || result.transcript.length} characters
                   </span>
-                )}
-              </div>
-            )}
+                  {result.duration && (
+                    <span>
+                      📊 ~{Math.round((result.stats?.words || result.transcript.split(/\s+/).length) / (result.duration / 60))} words/min
+                    </span>
+                  )}
+                  {result.size && (
+                    <span>
+                      💾 {formatFileSize(result.size)}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => {
+                      const blob = new Blob([result.transcript!], { type: 'text/plain' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `transcript-${result.videoId || 'audio'}.txt`
+                      a.click()
+                      URL.revokeObjectURL(url)
+                    }}
+                    className="ml-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm"
+                  >
+                    📥 Download
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
         </div>

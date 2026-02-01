@@ -1,137 +1,261 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { YoutubeTranscript } from 'youtube-transcript'
-import { AssemblyAI } from 'assemblyai'
-import path from 'path'
-import fs from 'fs'
-import { glob } from 'glob'
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
+// YouTube transcript API integration
+async function getYouTubeTranscript(videoId: string): Promise<{ text: string; source: string }> {
   try {
-    const { url } = await req.json()
+    // Call our Python script
+    const { spawn } = require('child_process');
+    const scriptPath = '/Users/northsea/clawd-dmitry/transcription-app/scripts/youtube_transcript.py';
 
-    if (!url) {
-      return NextResponse.json({ error: 'URL is required' }, { status: 400 })
-    }
+    return new Promise((resolve, reject) => {
+      const python = spawn('python3', [scriptPath, `https://www.youtube.com/watch?v=${videoId}`, '-f', 'json']);
+      let stdout = '';
+      let stderr = '';
 
-    // Extract video ID
-    const videoId = extractVideoId(url)
-    if (!videoId) {
-      return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
-    }
+      python.stdout.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
 
-    // Get API key from environment
-    const apiKey = process.env.ASSEMBLYAI_API_KEY
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'AssemblyAI API key not configured. Please set ASSEMBLYAI_API_KEY environment variable.' },
-        { status: 500 }
-      )
-    }
+      python.stderr.on('data', (data: Buffer) => {
+        stderr += data.toString();
+      });
 
-    // Initialize AssemblyAI
-    const aai = new AssemblyAI({ apiKey })
-
-    // Create temp directory in /tmp (Vercel serverless-compatible)
-    const tempDir = path.join('/tmp', 'youtube', `${Date.now()}`)
-    await fs.promises.mkdir(tempDir, { recursive: true, mode: 0o755 })
-
-    // Output file path (use video ID as filename to avoid issues)
-    const outputPath = path.join(tempDir, `${videoId}.mp3`)
-
-    // Download audio using yt-dlp (using absolute paths, no chdir)
-    const { spawn } = require('child_process')
-    const downloadPromise = new Promise<void>((resolve, reject) => {
-      const child = spawn('yt-dlp', [
-        '-x',
-        '--audio-format', 'mp3',
-        '--output', outputPath,
-        `https://www.youtube.com/watch?v=${videoId}`
-      ], { stdio: 'pipe' })
-
-      let stderr = ''
-      child.stderr?.on('data', (data: Buffer) => {
-        stderr += data.toString()
-      })
-
-      child.on('close', (code: number | null) => {
-        if (code && code !== 0 && stderr.includes('ERROR')) {
-          reject(new Error(`yt-dlp failed: ${stderr}`))
-        } else {
-          resolve()
+      python.on('close', (code: number) => {
+        if (code !== 0) {
+          reject(new Error(`Python script failed: ${stderr}`));
+          return;
         }
-      })
-    })
 
-    try {
-      await downloadPromise
-    } catch (downloadError: any) {
-      // Fallback: try to get transcript directly via youtube-transcript if download fails
-      try {
-        const transcript = await YoutubeTranscript.fetchTranscript(videoId)
-        const fullText = transcript.map((item: any) => item.text).join(' ').replace(/\s+/g, ' ').trim()
-        return NextResponse.json({
-          transcript: fullText,
-          note: 'Used YouTube transcript (AssemblyAI audio download failed)'
-        })
-      } catch {
-        return NextResponse.json(
-          { error: `Failed to download audio: ${downloadError.message}` },
-          { status: 500 }
-        )
-      }
-    }
+        try {
+          const transcriptData = JSON.parse(stdout);
+          const text = transcriptData.map((entry: any) => entry.text).join(' ');
+          resolve({ text, source: 'youtube-transcript-api' });
+        } catch (e) {
+          reject(new Error('Failed to parse transcript output'));
+        }
+      });
 
-    // Check if file exists
-    if (!fs.existsSync(outputPath)) {
-      return NextResponse.json({ error: 'No audio file was downloaded' }, { status: 500 })
-    }
-
-    // Transcribe using AssemblyAI (SDK handles upload + transcription)
-    let transcript
-    try {
-      transcript = await aai.transcripts.transcribe({ audio: outputPath })
-    } catch (error: any) {
-      // Clean up temp directory
-      fs.rmSync(tempDir, { recursive: true, force: true })
-      return NextResponse.json(
-        { error: `Failed to transcribe: ${error.message}` },
-        { status: 500 }
-      )
-    }
-
-    // Clean up temp directory
-    fs.rmSync(tempDir, { recursive: true, force: true })
-
-    if (!transcript.text) {
-      return NextResponse.json({ error: 'No transcript generated' }, { status: 500 })
-    }
-
-    return NextResponse.json({
-      transcript: transcript.text,
-      filename: `${videoId}.mp3`,
-      duration: transcript.audio_duration
-    })
-  } catch (error: any) {
-    console.error('YouTube transcription error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to transcribe video' },
-      { status: 500 }
-    )
+      // Timeout after 60 seconds
+      setTimeout(() => {
+        python.kill();
+        reject(new Error('Transcript extraction timeout'));
+      }, 60000);
+    });
+  } catch (error) {
+    throw new Error(`YouTube transcript extraction failed: ${error}`);
   }
 }
 
-function extractVideoId(url: string): string | null {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /^([a-zA-Z0-9_-]{11})$/
-  ]
+// AssemblyAI fallback (original method)
+async function getAssemblyAITranscript(videoUrl: string): Promise<{ text: string; source: string }> {
+  try {
+    const ytDlp = require('yt-dlp-exec');
+    const fs = require('fs');
+    const path = require('path');
+    const { exec } = require('child_process');
 
-  for (const pattern of patterns) {
-    const match = url.match(pattern)
-    if (match && match[1]) {
-      return match[1]
+    // Download audio
+    const audioPath = `/tmp/audio_${Date.now()}.mp3`;
+    await ytDlp(videoUrl, {
+      extractAudio: true,
+      audioFormat: 'mp3',
+      output: audioPath,
+    });
+
+    // Upload to AssemblyAI
+    const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': process.env.ASSEMBLYAI_API_KEY!,
+      },
+      body: fs.createReadStream(audioPath),
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error('Failed to upload audio to AssemblyAI');
     }
-  }
 
-  return null
+    const { upload_url } = await uploadResponse.json();
+
+    // Transcribe
+    const transcribeResponse = await fetch('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST',
+      headers: {
+        'Authorization': process.env.ASSEMBLYAI_API_KEY!,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        audio_url: upload_url,
+      }),
+    });
+
+    if (!transcribeResponse.ok) {
+      throw new Error('Failed to start transcription');
+    }
+
+    const { id } = await transcribeResponse.json();
+
+    // Poll for completion
+    let transcript = null;
+    let attempts = 0;
+    while (attempts < 60) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const statusResponse = await fetch(`https://api.assemblyai.com/v2/transcript/${id}`, {
+        headers: {
+          'Authorization': process.env.ASSEMBLYAI_API_KEY!,
+        },
+      });
+
+      transcript = await statusResponse.json();
+
+      if (transcript.status === 'completed') {
+        // Cleanup
+        fs.unlinkSync(audioPath);
+
+        return { text: transcript.text, source: 'assemblyai' };
+      }
+
+      if (transcript.status === 'error') {
+        throw new Error(`AssemblyAI error: ${transcript.error}`);
+      }
+
+      attempts++;
+    }
+
+    throw new Error('Transcription timeout');
+
+  } catch (error) {
+    throw new Error(`AssemblyAI fallback failed: ${error}`);
+  }
+}
+
+// Generate 10 key takeaways using AI
+async function generateKeyTakeaways(transcript: string): Promise<string> {
+  try {
+    // Use OpenRouter API with zai/glm-4.7
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'zai/glm-4.7',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert at extracting actionable insights from video transcripts. Your task is to analyze the transcript and generate exactly 10 key takeaways that are:
+
+1. **Specific and actionable** - Clear steps the reader can implement
+2. **Practical** - Can be applied to real-world workflows immediately
+3. **Concise** - Each takeaway should be 1-2 sentences max
+4. **Prioritized** - Most important insights first
+
+Format each takeaway as:
+**#. [Title]** - Actionable description
+
+Example:
+**1. Automate Repetitive Tasks** - Use AI agents to handle routine operations like email management and scheduling, freeing up time for high-value work.
+
+Generate exactly 10 takeaways. No intro, no outro, just the numbered list.`
+          },
+          {
+            role: 'user',
+            content: `Please analyze this transcript and generate 10 key takeaways:\n\n${transcript.slice(0, 15000)}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate takeaways');
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+
+  } catch (error) {
+    console.error('Failed to generate takeaways:', error);
+    return '';
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { url } = await request.json();
+
+    if (!url) {
+      return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+    }
+
+    // Extract video ID
+    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (!videoIdMatch) {
+      return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 });
+    }
+
+    const videoId = videoIdMatch[1];
+    let transcript = '';
+    let source = '';
+    let fallbackUsed = false;
+
+    // Method 1: Try YouTube Transcript API (fast, free)
+    try {
+      console.log('Attempting YouTube transcript API...');
+      const result = await getYouTubeTranscript(videoId);
+      transcript = result.text;
+      source = result.source;
+      console.log('YouTube transcript API succeeded!');
+    } catch (error) {
+      console.error('YouTube transcript API failed:', error);
+      fallbackUsed = true;
+
+      // Method 2: Fallback to AssemblyAI
+      try {
+        console.log('Falling back to AssemblyAI...');
+        const result = await getAssemblyAITranscript(url);
+        transcript = result.text;
+        source = result.source;
+        console.log('AssemblyAI succeeded!');
+      } catch (error2) {
+        console.error('AssemblyAI also failed:', error2);
+
+        return NextResponse.json({
+          error: 'Failed to extract transcript',
+          note: 'No transcript available on YouTube. Video may not have captions, or access is restricted.',
+          details: 'YouTube transcript API not available. Audio download/transcription failed.',
+          fallbackAttempted: true,
+          allMethodsFailed: true,
+        }, { status: 400 });
+      }
+    }
+
+    // Generate key takeaways
+    console.log('Generating key takeaways...');
+    const takeaways = await generateKeyTakeaways(transcript);
+
+    return NextResponse.json({
+      success: true,
+      transcript,
+      takeaways,
+      source,
+      fallbackUsed,
+      videoId,
+      stats: {
+        characters: transcript.length,
+        words: transcript.split(/\s+/).length,
+      },
+    });
+
+  } catch (error) {
+    console.error('YouTube API error:', error);
+    return NextResponse.json({
+      error: 'Failed to process video',
+      note: 'An unexpected error occurred',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    }, { status: 500 });
+  }
 }
