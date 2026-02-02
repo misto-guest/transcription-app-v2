@@ -180,7 +180,7 @@ export default function SystemStatus() {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Fallback Level:</span>
-              <span className="text-orange-400 font-medium">3 (Emergency)</span>
+              <span className="text-yellow-400 font-medium">2 (Primary Backup)</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Type:</span>
@@ -207,7 +207,7 @@ export default function SystemStatus() {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Fallback Level:</span>
-              <span className="text-yellow-400 font-medium">2 (Backup)</span>
+              <span className="text-red-400 font-medium">3 (Last Resort)</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Type:</span>

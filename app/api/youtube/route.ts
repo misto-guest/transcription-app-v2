@@ -194,67 +194,67 @@ export async function POST(request: NextRequest) {
       console.error('YouTube transcript API failed:', error);
       fallbackUsed = true;
 
-      // Method 2: Fallback to AssemblyAI
+      // Method 2: Fallback to Puppeteer automation (youtubetranscript.com) - FREE
       try {
-        console.log('Falling back to AssemblyAI...');
-        const result = await getAssemblyAITranscript(url);
-        transcript = result.text;
-        source = result.source;
-        console.log('AssemblyAI succeeded!');
-      } catch (error2) {
-        console.error('AssemblyAI also failed:', error2);
+        console.log('Falling back to Puppeteer automation (youtubetranscript.com)...');
+        const { spawn } = require('child_process');
+        const scriptPath = '/Users/northsea/clawd-dmitry/transcription-app/scripts/puppeteer-youtube-transcript.js';
 
-        // Method 3: Fallback to Puppeteer automation
-        try {
-          console.log('Falling back to Puppeteer automation...');
-          const { spawn } = require('child_process');
-          const scriptPath = '/Users/northsea/clawd-dmitry/transcription-app/scripts/puppeteer-youtube-transcript.js';
+        const puppeteerResult = await new Promise<string>((resolve, reject) => {
+          const node = spawn('node', [scriptPath, url]);
+          let stdout = '';
+          let stderr = '';
 
-          const puppeteerResult = await new Promise<string>((resolve, reject) => {
-            const node = spawn('node', [scriptPath, url]);
-            let stdout = '';
-            let stderr = '';
-
-            node.stdout.on('data', (data: Buffer) => {
-              stdout += data.toString();
-            });
-
-            node.stderr.on('data', (data: Buffer) => {
-              stderr += data.toString();
-            });
-
-            node.on('close', (code: number) => {
-              if (code !== 0) {
-                reject(new Error(`Puppeteer script failed: ${stderr}`));
-                return;
-              }
-
-              // Extract transcript from output
-              const match = stdout.match(/=== TRANSCRIPT ===\n([\s\S]+)\n=== END ===/);
-              if (match && match[1]) {
-                resolve(match[1].trim());
-              } else {
-                reject(new Error('Could not extract transcript from Puppeteer output'));
-              }
-            });
-
-            // Timeout after 90 seconds (Puppeteer needs more time)
-            setTimeout(() => {
-              node.kill();
-              reject(new Error('Puppeteer automation timeout'));
-            }, 90000);
+          node.stdout.on('data', (data: Buffer) => {
+            stdout += data.toString();
           });
 
-          transcript = puppeteerResult;
-          source = 'puppeteer-youtubetranscript-com';
-          console.log('Puppeteer automation succeeded!');
+          node.stderr.on('data', (data: Buffer) => {
+            stderr += data.toString();
+          });
+
+          node.on('close', (code: number) => {
+            if (code !== 0) {
+              reject(new Error(`Puppeteer script failed: ${stderr}`));
+              return;
+            }
+
+            // Extract transcript from output
+            const match = stdout.match(/=== TRANSCRIPT ===\n([\s\S]+)\n=== END ===/);
+            if (match && match[1]) {
+              resolve(match[1].trim());
+            } else {
+              reject(new Error('Could not extract transcript from Puppeteer output'));
+            }
+          });
+
+          // Timeout after 90 seconds (Puppeteer needs more time)
+          setTimeout(() => {
+            node.kill();
+            reject(new Error('Puppeteer automation timeout'));
+          }, 90000);
+        });
+
+        transcript = puppeteerResult;
+        source = 'puppeteer-youtubetranscript-com';
+        console.log('Puppeteer automation succeeded!');
+      } catch (error2) {
+        console.error('Puppeteer automation also failed:', error2);
+
+        // Method 3: Fallback to AssemblyAI (PAID - last resort)
+        try {
+          console.log('Falling back to AssemblyAI (last resort - paid)...');
+          const result = await getAssemblyAITranscript(url);
+          transcript = result.text;
+          source = result.source;
+          console.log('AssemblyAI succeeded!');
         } catch (error3) {
-          console.error('Puppeteer automation also failed:', error3);
+          console.error('AssemblyAI also failed:', error3);
 
           return NextResponse.json({
             error: 'Failed to extract transcript',
             note: 'No transcript available on YouTube. Video may not have captions, or access is restricted.',
-            details: 'YouTube transcript API not available. Audio download/transcription failed. Puppeteer automation failed.',
+            details: 'YouTube transcript API not available. youtubetranscript.com scraping failed. Audio download/transcription failed.',
             fallbackAttempted: true,
             allMethodsFailed: true,
           }, { status: 400 });

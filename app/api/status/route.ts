@@ -57,9 +57,9 @@ export async function GET() {
         assemblyAI: {
           available: assemblyAIConfigured,
           status: assemblyAIConfigured ? 'configured' : 'not_configured',
-          fallbackLevel: 2,
+          fallbackLevel: 3,
           type: 'transcription-service',
-          description: 'AssemblyAI audio transcription API'
+          description: 'AssemblyAI audio transcription API (paid - last resort)'
         }
       },
       metrics: {
@@ -67,8 +67,8 @@ export async function GET() {
         activeMethod: 'youtube-transcript-nodejs',
         fallbackChain: [
           'youtube-transcript-nodejs',
-          'assemblyai',
-          'puppeteer-youtubetranscript-com'
+          'puppeteer-youtubetranscript-com',
+          'assemblyai'
         ]
       },
       health: {
