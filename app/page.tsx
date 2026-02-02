@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import Header from './components/Header'
+import SystemStatus from './components/SystemStatus'
 
 type ApiResult = {
   transcript?: string
@@ -146,6 +147,7 @@ export default function Home() {
       <Header />
       <main className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600">
         <div className="max-w-5xl mx-auto px-4 md:px-8 py-8">
+          <SystemStatus />
           {/* Hero Section */}
           <div className="text-center mb-8 pt-8">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">

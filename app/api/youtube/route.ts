@@ -1,47 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// YouTube transcript API integration
+// YouTube transcript API integration using Node.js package
 async function getYouTubeTranscript(videoId: string): Promise<{ text: string; source: string }> {
   try {
-    // Call our Python script
-    const { spawn } = require('child_process');
-    const scriptPath = '/Users/northsea/clawd-dmitry/transcription-app/scripts/youtube_transcript.py';
+    // Use the youtube-transcript Node.js package (already installed)
+    const { YoutubeTranscript } = require('youtube-transcript');
 
-    return new Promise((resolve, reject) => {
-      const python = spawn('python3', [scriptPath, `https://www.youtube.com/watch?v=${videoId}`, '-f', 'json']);
-      let stdout = '';
-      let stderr = '';
+    console.log(`Fetching transcript for video ID: ${videoId}`);
 
-      python.stdout.on('data', (data: Buffer) => {
-        stdout += data.toString();
-      });
+    // Fetch transcript using the Node.js package
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
 
-      python.stderr.on('data', (data: Buffer) => {
-        stderr += data.toString();
-      });
+    if (!transcript || transcript.length === 0) {
+      throw new Error('No transcript found');
+    }
 
-      python.on('close', (code: number) => {
-        if (code !== 0) {
-          reject(new Error(`Python script failed: ${stderr}`));
-          return;
-        }
+    // Combine all transcript segments
+    const text = transcript.map((entry: any) => entry.text).join(' ');
 
-        try {
-          const transcriptData = JSON.parse(stdout);
-          const text = transcriptData.map((entry: any) => entry.text).join(' ');
-          resolve({ text, source: 'youtube-transcript-api' });
-        } catch (e) {
-          reject(new Error('Failed to parse transcript output'));
-        }
-      });
+    console.log(`Successfully fetched ${transcript.length} segments`);
 
-      // Timeout after 60 seconds
-      setTimeout(() => {
-        python.kill();
-        reject(new Error('Transcript extraction timeout'));
-      }, 60000);
-    });
+    return { text, source: 'youtube-transcript-nodejs' };
   } catch (error) {
+    console.error('YouTube transcript API failed:', error);
     throw new Error(`YouTube transcript extraction failed: ${error}`);
   }
 }
@@ -223,13 +204,61 @@ export async function POST(request: NextRequest) {
       } catch (error2) {
         console.error('AssemblyAI also failed:', error2);
 
-        return NextResponse.json({
-          error: 'Failed to extract transcript',
-          note: 'No transcript available on YouTube. Video may not have captions, or access is restricted.',
-          details: 'YouTube transcript API not available. Audio download/transcription failed.',
-          fallbackAttempted: true,
-          allMethodsFailed: true,
-        }, { status: 400 });
+        // Method 3: Fallback to Puppeteer automation
+        try {
+          console.log('Falling back to Puppeteer automation...');
+          const { spawn } = require('child_process');
+          const scriptPath = '/Users/northsea/clawd-dmitry/transcription-app/scripts/puppeteer-youtube-transcript.js';
+
+          const puppeteerResult = await new Promise<string>((resolve, reject) => {
+            const node = spawn('node', [scriptPath, url]);
+            let stdout = '';
+            let stderr = '';
+
+            node.stdout.on('data', (data: Buffer) => {
+              stdout += data.toString();
+            });
+
+            node.stderr.on('data', (data: Buffer) => {
+              stderr += data.toString();
+            });
+
+            node.on('close', (code: number) => {
+              if (code !== 0) {
+                reject(new Error(`Puppeteer script failed: ${stderr}`));
+                return;
+              }
+
+              // Extract transcript from output
+              const match = stdout.match(/=== TRANSCRIPT ===\n([\s\S]+)\n=== END ===/);
+              if (match && match[1]) {
+                resolve(match[1].trim());
+              } else {
+                reject(new Error('Could not extract transcript from Puppeteer output'));
+              }
+            });
+
+            // Timeout after 90 seconds (Puppeteer needs more time)
+            setTimeout(() => {
+              node.kill();
+              reject(new Error('Puppeteer automation timeout'));
+            }, 90000);
+          });
+
+          transcript = puppeteerResult;
+          source = 'puppeteer-youtubetranscript-com';
+          console.log('Puppeteer automation succeeded!');
+        } catch (error3) {
+          console.error('Puppeteer automation also failed:', error3);
+
+          return NextResponse.json({
+            error: 'Failed to extract transcript',
+            note: 'No transcript available on YouTube. Video may not have captions, or access is restricted.',
+            details: 'YouTube transcript API not available. Audio download/transcription failed. Puppeteer automation failed.',
+            fallbackAttempted: true,
+            allMethodsFailed: true,
+          }, { status: 400 });
+        }
       }
     }
 

@@ -11,7 +11,11 @@ async function getPodcastFromSpotify(spotifyUrl: string) {
       throw new Error('Invalid Spotify URL format');
     }
 
-    const spotifyId = episodeMatch ? episodeMatch[1] : showMatch[1];
+    const spotifyId = episodeMatch ? episodeMatch[1] : (showMatch ? showMatch[1] : null);
+
+    if (!spotifyId) {
+      throw new Error('Could not extract Spotify ID from URL');
+    }
 
     // Use Listen Notes API (has Spotify integration)
     const listenNotesApiKey = process.env.LISTENNOTES_API_KEY;
@@ -109,14 +113,16 @@ async function downloadSpotifyAudio(spotifyUrl: string): Promise<Buffer> {
 
 // AssemblyAI transcription
 async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
-  const FormData = require('form-data');
+  const fs = require('fs');
+  const path = require('path');
+
+  // Save buffer to temp file
+  const tempFile = `/tmp/audio_${Date.now()}.mp3`;
+  fs.writeFileSync(tempFile, audioBuffer);
 
   // Upload to AssemblyAI
   const uploadForm = new FormData();
-  uploadForm.append('file', audioBuffer, {
-    filename: 'audio.mp3',
-    contentType: 'audio/mpeg'
-  });
+  uploadForm.append('file', fs.createReadStream(tempFile));
 
   const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', {
     method: 'POST',
